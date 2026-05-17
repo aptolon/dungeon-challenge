@@ -45,13 +45,10 @@ func (p *Processor) impossibleMove(event event.Event) {
 
 func (p *Processor) Process(event event.Event) {
 	pl := p.getOrCreatePlayer(event.PlayerID)
-	if pl.Dead {
+	if pl.Finished {
 		return
+	}
 
-	}
-	if pl.Disqualified {
-		return
-	}
 	if event.EventID != 1 && !pl.Registered {
 		pl.Disqualified = true
 		fmt.Printf(
@@ -93,8 +90,8 @@ func (p *Processor) Process(event event.Event) {
 	//kill monster
 	case 3:
 		if !pl.InDungeon ||
-			pl.CompletedFloors[pl.CurrentFloor] ||
 			pl.BossEntered ||
+			pl.CompletedFloors[pl.CurrentFloor] ||
 			pl.FloorKills[pl.CurrentFloor] >= p.config.Monsters {
 			p.impossibleMove(event)
 			return
@@ -112,5 +109,82 @@ func (p *Processor) Process(event event.Event) {
 			pl.FloorDurations = append(pl.FloorDurations, duration)
 
 		}
+	// next floor
+	case 4:
+		if !pl.InDungeon ||
+			pl.BossEntered ||
+			!pl.CompletedFloors[pl.CurrentFloor] ||
+			pl.CurrentFloor >= p.config.Floors {
+			p.impossibleMove(event)
+
+			return
+		}
+		pl.CurrentFloor++
+		if !pl.CompletedFloors[pl.CurrentFloor] {
+			pl.FloorStartTime = event.Time
+		}
+		fmt.Printf(
+			"[%s] Player [%d] went to the next floor\n",
+			formatTime(event.Time),
+			event.PlayerID,
+		)
+	// prev floor
+	case 5:
+		if !pl.InDungeon ||
+			pl.BossEntered ||
+			pl.CurrentFloor == 1 {
+			p.impossibleMove(event)
+			return
+		}
+		pl.CurrentFloor--
+		fmt.Printf(
+			"[%s] Player [%d] went to the previous floor\n",
+			formatTime(event.Time),
+			event.PlayerID,
+		)
+	//entered the boss's floor
+	case 6:
+		if !pl.InDungeon ||
+			len(pl.CompletedFloors) != p.config.Floors ||
+			pl.BossEntered {
+			p.impossibleMove(event)
+			return
+		}
+		pl.BossEntered = true
+		fmt.Printf(
+			"[%s] Player [%d] entered the boss's floor\n",
+			formatTime(event.Time),
+			event.PlayerID,
+		)
+		//killed the boss
+	case 7:
+		if !pl.InDungeon ||
+			!pl.BossEntered ||
+			pl.BossKilled {
+			p.impossibleMove(event)
+			return
+		}
+		pl.BossKilled = true
+		pl.BossKillTime = event.Time
+		fmt.Printf(
+			"[%s] Player [%d] killed the boss\n",
+			formatTime(event.Time),
+			event.PlayerID,
+		)
+		//left the dungeon
+	case 8:
+		if !pl.InDungeon {
+			p.impossibleMove(event)
+			return
+		}
+		pl.InDungeon = false
+		pl.Finished = true
+		pl.ExitTime = event.Time
+		fmt.Printf(
+			"[%s] Player [%d] left the dungeon\n",
+			formatTime(event.Time),
+			event.PlayerID,
+		)
 	}
+
 }

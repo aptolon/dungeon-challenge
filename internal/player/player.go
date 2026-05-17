@@ -27,6 +27,8 @@ type Player struct {
 
 	BossEnterTime time.Time
 	BossKillTime  time.Time
+
+	Finished bool
 }
 
 func NewPlayer(id int) *Player {
