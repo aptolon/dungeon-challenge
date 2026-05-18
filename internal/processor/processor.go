@@ -5,6 +5,7 @@ import (
 	"dungeon-challenge/internal/event"
 	"dungeon-challenge/internal/player"
 	"fmt"
+	"strconv"
 	"time"
 )
 
@@ -82,6 +83,7 @@ func (p *Processor) Process(event event.Event) {
 		pl.CurrentFloor = 1
 		pl.FloorStartTime = event.Time
 		pl.EnterTime = event.Time
+
 		fmt.Printf(
 			"[%s] Player [%d] entered the dungeon\n",
 			formatTime(event.Time),
@@ -185,6 +187,61 @@ func (p *Processor) Process(event event.Event) {
 			formatTime(event.Time),
 			event.PlayerID,
 		)
-	}
+		//cannot continue due to [`reason`]
+	case 9:
+		if !pl.InDungeon {
+			p.impossibleMove(event)
+			return
+		}
+		fmt.Printf(
+			"[%s] Player [%d] cannot continue due to [%s]\n",
+			formatTime(event.Time),
+			event.PlayerID,
+			event.Extra,
+		)
+		pl.Disqualified = true
+		pl.Finished = true
+	//has restored [`health`] of health
+	case 10:
+		if !pl.InDungeon {
+			p.impossibleMove(event)
+			return
+		}
+		fmt.Printf(
+			"[%s] Player [%d] has restored [%s] of health\n",
+			formatTime(event.Time),
+			event.PlayerID,
+			event.Extra,
+		)
+		heal, _ := strconv.Atoi(event.Extra)
+		pl.HP += heal
+		if pl.HP > 100 {
+			pl.HP = 100
+		}
 
+	//recieved [`damage`] of damage
+	case 11:
+		if !pl.InDungeon {
+			p.impossibleMove(event)
+			return
+		}
+		fmt.Printf(
+			"[%s] Player [%d] recieved [%s] of damage\n",
+			formatTime(event.Time),
+			event.PlayerID,
+			event.Extra,
+		)
+		dmg, _ := strconv.Atoi(event.Extra)
+		pl.HP -= dmg
+		if pl.HP <= 0 {
+			pl.HP = 0
+			pl.Dead = true
+			fmt.Printf(
+				"[%s] Player [%d] is dead\n",
+				formatTime(event.Time),
+				event.PlayerID,
+			)
+			pl.Finished = true
+		}
+	}
 }
