@@ -167,11 +167,13 @@ func (p *Processor) Process(event event.Event) {
 			pl.CurrentFloor != p.config.Floors ||
 			len(pl.CompletedFloors) != p.config.Floors ||
 			pl.BossEntered {
+
 			p.impossibleMove(event)
 			return
 		}
 		pl.BossEntered = true
 		pl.BossEnterTime = event.Time
+
 		fmt.Printf(
 			"[%s] Player [%d] entered the boss's floor\n",
 			formatTime(event.Time),
@@ -267,4 +269,57 @@ func (p *Processor) Process(event event.Event) {
 			pl.ExitTime = event.Time
 		}
 	}
+}
+
+func formatDuration(d time.Duration) string {
+	h := int(d.Hours())
+	m := int(d.Minutes()) % 60
+	s := int(d.Seconds()) % 60
+
+	return fmt.Sprintf("%02d:%02d:%02d", h, m, s)
+}
+
+func averageDuration(arr []time.Duration) time.Duration {
+	if len(arr) == 0 {
+		return 0
+	}
+
+	var total time.Duration
+
+	for _, d := range arr {
+		total += d
+	}
+
+	return total / time.Duration(len(arr))
+}
+
+func (p *Processor) PrintReport() {
+	fmt.Println("Final report:")
+	for _, pl := range p.players {
+		state := "FAIL"
+
+		if pl.Disqualified {
+			state = "DISQUAL"
+		} else if pl.BossKilled &&
+			len(pl.CompletedFloors) == p.config.Floors {
+			state = "SUCCESS"
+		}
+		totalTime := pl.ExitTime.Sub(pl.EnterTime)
+		avgFloor := averageDuration(pl.FloorDurations)
+		bossTime := time.Duration(0)
+
+		if pl.BossKilled {
+			bossTime = pl.BossKillTime.Sub(pl.BossEnterTime)
+		}
+		fmt.Printf(
+			"[%s] %d [%s, %s, %s] HP:%d\n",
+			state,
+			pl.ID,
+			formatDuration(totalTime),
+			formatDuration(avgFloor),
+			formatDuration(bossTime),
+			pl.HP,
+		)
+	}
+
 }
