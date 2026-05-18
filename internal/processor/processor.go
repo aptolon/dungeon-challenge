@@ -5,6 +5,7 @@ import (
 	"dungeon-challenge/internal/event"
 	"dungeon-challenge/internal/player"
 	"fmt"
+	"sort"
 	"strconv"
 	"time"
 )
@@ -165,12 +166,13 @@ func (p *Processor) Process(event event.Event) {
 	case 6:
 		if !pl.InDungeon ||
 			pl.CurrentFloor != p.config.Floors ||
-			len(pl.CompletedFloors) != p.config.Floors ||
+			len(pl.CompletedFloors) != p.config.Floors-1 ||
 			pl.BossEntered {
 
 			p.impossibleMove(event)
 			return
 		}
+		pl.CurrentFloor++
 		pl.BossEntered = true
 		pl.BossEnterTime = event.Time
 
@@ -187,8 +189,10 @@ func (p *Processor) Process(event event.Event) {
 			p.impossibleMove(event)
 			return
 		}
+
 		pl.BossKilled = true
 		pl.BossKillTime = event.Time
+		pl.CompletedFloors[pl.CurrentFloor] = true
 		fmt.Printf(
 			"[%s] Player [%d] killed the boss\n",
 			formatTime(event.Time),
@@ -294,8 +298,19 @@ func averageDuration(arr []time.Duration) time.Duration {
 }
 
 func (p *Processor) PrintReport() {
+
 	fmt.Println("Final report:")
-	for _, pl := range p.players {
+
+	ids := make([]int, 0, len(p.players))
+
+	for id := range p.players {
+		ids = append(ids, id)
+	}
+
+	sort.Ints(ids)
+
+	for _, id := range ids {
+		pl := p.players[id]
 		state := "FAIL"
 
 		if pl.Disqualified {
@@ -304,7 +319,11 @@ func (p *Processor) PrintReport() {
 			len(pl.CompletedFloors) == p.config.Floors {
 			state = "SUCCESS"
 		}
-		totalTime := pl.ExitTime.Sub(pl.EnterTime)
+
+		totalTime := time.Duration(0)
+		if !pl.EnterTime.IsZero() {
+			totalTime = pl.ExitTime.Sub(pl.EnterTime)
+		}
 		avgFloor := averageDuration(pl.FloorDurations)
 		bossTime := time.Duration(0)
 
