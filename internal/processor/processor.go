@@ -54,12 +54,20 @@ func (p *Processor) isDungeonOpen(t time.Time) bool {
 }
 func (p *Processor) Process(event event.Event) {
 	pl := p.getOrCreatePlayer(event.PlayerID)
+	if !event.Time.Before(p.dungeonCloseTime()) && pl.InDungeon {
+		pl.InDungeon = false
+		pl.Finished = true
+		pl.ExitTime = p.dungeonCloseTime()
+	}
+
 	if pl.Finished {
 		return
 	}
 
 	if event.EventID != 1 && !pl.Registered {
 		pl.Disqualified = true
+		pl.Finished = true
+		pl.ExitTime = event.Time
 		fmt.Printf(
 			"[%s] Player [%d] is disqualified\n",
 			formatTime(event.Time),
@@ -83,7 +91,8 @@ func (p *Processor) Process(event event.Event) {
 		)
 	//enter
 	case 2:
-		if pl.InDungeon {
+		if pl.InDungeon ||
+			!p.isDungeonOpen(event.Time) {
 			p.impossibleMove(event)
 			return
 		}
@@ -155,12 +164,14 @@ func (p *Processor) Process(event event.Event) {
 	//entered the boss's floor
 	case 6:
 		if !pl.InDungeon ||
+			pl.CurrentFloor != p.config.Floors ||
 			len(pl.CompletedFloors) != p.config.Floors ||
 			pl.BossEntered {
 			p.impossibleMove(event)
 			return
 		}
 		pl.BossEntered = true
+		pl.BossEnterTime = event.Time
 		fmt.Printf(
 			"[%s] Player [%d] entered the boss's floor\n",
 			formatTime(event.Time),
@@ -208,7 +219,9 @@ func (p *Processor) Process(event event.Event) {
 			event.Extra,
 		)
 		pl.Disqualified = true
+		pl.InDungeon = false
 		pl.Finished = true
+		pl.ExitTime = event.Time
 	//has restored [`health`] of health
 	case 10:
 		if !pl.InDungeon {
@@ -244,12 +257,14 @@ func (p *Processor) Process(event event.Event) {
 		if pl.HP <= 0 {
 			pl.HP = 0
 			pl.Dead = true
+			pl.InDungeon = false
 			fmt.Printf(
 				"[%s] Player [%d] is dead\n",
 				formatTime(event.Time),
 				event.PlayerID,
 			)
 			pl.Finished = true
+			pl.ExitTime = event.Time
 		}
 	}
 }
