@@ -44,6 +44,14 @@ func (p *Processor) impossibleMove(event event.Event) {
 	)
 }
 
+func (p *Processor) dungeonCloseTime() time.Time {
+	return p.config.OpenAt.Add(time.Duration(p.config.Duration) * time.Hour)
+}
+
+func (p *Processor) isDungeonOpen(t time.Time) bool {
+	return !t.Before(p.config.OpenAt) &&
+		!t.After(p.dungeonCloseTime())
+}
 func (p *Processor) Process(event event.Event) {
 	pl := p.getOrCreatePlayer(event.PlayerID)
 	if pl.Finished {
