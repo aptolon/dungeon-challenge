@@ -22,7 +22,7 @@ func main() {
 	}
 	defer eventsFile.Close()
 
-	processor := processor.NewProcessor(cfg)
+	p := processor.NewProcessor(cfg)
 
 	scanner := bufio.NewScanner(eventsFile)
 
@@ -35,12 +35,15 @@ func main() {
 			continue
 		}
 
-		processor.Process(ev)
+		if err := p.Process(ev); err != nil {
+			fmt.Println(err)
+			continue
+		}
 	}
 	if err := scanner.Err(); err != nil {
 		fmt.Println(err)
 		return
 	}
-	processor.PrintReport()
+	p.PrintReport()
 
 }

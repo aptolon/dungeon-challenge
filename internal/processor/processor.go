@@ -53,7 +53,7 @@ func (p *Processor) isDungeonOpen(t time.Time) bool {
 	return !t.Before(p.config.OpenAt) &&
 		!t.After(p.dungeonCloseTime())
 }
-func (p *Processor) Process(event event.Event) {
+func (p *Processor) Process(event event.Event) error {
 	pl := p.getOrCreatePlayer(event.PlayerID)
 	if !event.Time.Before(p.dungeonCloseTime()) && pl.InDungeon {
 		pl.InDungeon = false
@@ -62,7 +62,7 @@ func (p *Processor) Process(event event.Event) {
 	}
 
 	if pl.Finished {
-		return
+		return nil
 	}
 
 	if event.EventID != 1 && !pl.Registered {
@@ -74,7 +74,7 @@ func (p *Processor) Process(event event.Event) {
 			formatTime(event.Time),
 			event.PlayerID,
 		)
-		return
+		return nil
 	}
 
 	switch event.EventID {
@@ -82,7 +82,7 @@ func (p *Processor) Process(event event.Event) {
 	case 1:
 		if pl.Registered {
 			p.impossibleMove(event)
-			return
+			return nil
 		}
 		pl.Registered = true
 		fmt.Printf(
@@ -95,7 +95,7 @@ func (p *Processor) Process(event event.Event) {
 		if pl.InDungeon ||
 			!p.isDungeonOpen(event.Time) {
 			p.impossibleMove(event)
-			return
+			return nil
 		}
 		pl.InDungeon = true
 		pl.CurrentFloor = 1
@@ -114,7 +114,7 @@ func (p *Processor) Process(event event.Event) {
 			pl.CompletedFloors[pl.CurrentFloor] ||
 			pl.FloorKills[pl.CurrentFloor] >= p.config.Monsters {
 			p.impossibleMove(event)
-			return
+			return nil
 		}
 
 		pl.FloorKills[pl.CurrentFloor]++
@@ -137,7 +137,7 @@ func (p *Processor) Process(event event.Event) {
 			pl.CurrentFloor >= p.config.Floors {
 			p.impossibleMove(event)
 
-			return
+			return nil
 		}
 		pl.CurrentFloor++
 		if !pl.CompletedFloors[pl.CurrentFloor] {
@@ -154,7 +154,7 @@ func (p *Processor) Process(event event.Event) {
 			pl.BossEntered ||
 			pl.CurrentFloor == 1 {
 			p.impossibleMove(event)
-			return
+			return nil
 		}
 		pl.CurrentFloor--
 		fmt.Printf(
@@ -170,7 +170,7 @@ func (p *Processor) Process(event event.Event) {
 			pl.BossEntered {
 
 			p.impossibleMove(event)
-			return
+			return nil
 		}
 		pl.CurrentFloor++
 		pl.BossEntered = true
@@ -187,7 +187,7 @@ func (p *Processor) Process(event event.Event) {
 			!pl.BossEntered ||
 			pl.BossKilled {
 			p.impossibleMove(event)
-			return
+			return nil
 		}
 
 		pl.BossKilled = true
@@ -202,7 +202,7 @@ func (p *Processor) Process(event event.Event) {
 	case 8:
 		if !pl.InDungeon {
 			p.impossibleMove(event)
-			return
+			return nil
 		}
 		pl.InDungeon = false
 		pl.Finished = true
@@ -216,7 +216,7 @@ func (p *Processor) Process(event event.Event) {
 	case 9:
 		if !pl.InDungeon {
 			p.impossibleMove(event)
-			return
+			return nil
 		}
 		fmt.Printf(
 			"[%s] Player [%d] cannot continue due to [%s]\n",
@@ -232,7 +232,7 @@ func (p *Processor) Process(event event.Event) {
 	case 10:
 		if !pl.InDungeon {
 			p.impossibleMove(event)
-			return
+			return nil
 		}
 		fmt.Printf(
 			"[%s] Player [%d] has restored [%s] of health\n",
@@ -240,7 +240,10 @@ func (p *Processor) Process(event event.Event) {
 			event.PlayerID,
 			event.Extra,
 		)
-		heal, _ := strconv.Atoi(event.Extra)
+		heal, err := strconv.Atoi(event.Extra)
+		if err != nil {
+			return err
+		}
 		pl.HP += heal
 		if pl.HP > 100 {
 			pl.HP = 100
@@ -250,7 +253,7 @@ func (p *Processor) Process(event event.Event) {
 	case 11:
 		if !pl.InDungeon {
 			p.impossibleMove(event)
-			return
+			return nil
 		}
 		fmt.Printf(
 			"[%s] Player [%d] recieved [%s] of damage\n",
@@ -258,7 +261,10 @@ func (p *Processor) Process(event event.Event) {
 			event.PlayerID,
 			event.Extra,
 		)
-		dmg, _ := strconv.Atoi(event.Extra)
+		dmg, err := strconv.Atoi(event.Extra)
+		if err != nil {
+			return err
+		}
 		pl.HP -= dmg
 		if pl.HP <= 0 {
 			pl.HP = 0
@@ -273,6 +279,7 @@ func (p *Processor) Process(event event.Event) {
 			pl.ExitTime = event.Time
 		}
 	}
+	return nil
 }
 
 func formatDuration(d time.Duration) string {
